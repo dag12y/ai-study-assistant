@@ -4,9 +4,15 @@ import { db } from "../../database/client.js";
 import { users } from "../../database/schema.js";
 import { AppError } from "../../lib/errors.js";
 
-import { hashPassword } from "./auth.utils.js";
-
 import type { RegisterUserInput, PublicUser } from "./auth.types.js";
+
+import {
+  generateAccessToken,
+  hashPassword,
+  verifyPassword,
+} from "./auth.utils.js";
+
+import type { LoginInput } from "./auth.schemas.js";
 
 export const registerUser = async (
   input: RegisterUserInput,
@@ -47,4 +53,49 @@ export const registerUser = async (
   }
 
   return user;
+};
+
+export const loginUser = async (input: LoginInput) => {
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, input.email),
+  });
+
+  if (!user) {
+    throw new AppError(
+      "Invalid email or password.",
+      401,
+      "INVALID_CREDENTIALS",
+    );
+  }
+
+  if (!user.isActive) {
+    throw new AppError("This account is inactive.", 403, "ACCOUNT_INACTIVE");
+  }
+
+  const passwordValid = await verifyPassword(user.passwordHash, input.password);
+
+  if (!passwordValid) {
+    throw new AppError(
+      "Invalid email or password.",
+      401,
+      "INVALID_CREDENTIALS",
+    );
+  }
+
+  const accessToken = generateAccessToken({
+    sub: user.id,
+    role: user.role,
+  });
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    },
+    accessToken,
+  };
 };

@@ -1,8 +1,8 @@
 import type { RequestHandler } from "express";
 
-import { registerSchema } from "./auth.schemas.js";
+import { loginSchema, registerSchema } from "./auth.schemas.js";
 
-import { registerUser } from "./auth.service.js";
+import { loginUser, registerUser } from "./auth.service.js";
 
 export const register: RequestHandler = async (req, res, next) => {
   try {
@@ -21,3 +21,23 @@ export const register: RequestHandler = async (req, res, next) => {
     next(error);
   }
 };
+
+export const login: RequestHandler =
+  async (req, res, next) => {
+    try {
+      const input =
+        loginSchema.parse(req.body);
+
+      const result =
+        await loginUser(input);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message:
+          "Login successful.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };

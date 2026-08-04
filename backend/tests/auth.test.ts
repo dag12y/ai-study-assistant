@@ -4,6 +4,8 @@ import request from "supertest";
 
 import app from "../src/app.js";
 import { pool } from "../src/database/client.js";
+import jwt from "jsonwebtoken";
+import { env } from "../src/config/env.js";
 
 describe("Authentication", () => {
   const testEmail = `test-${Date.now()}@example.com`;
@@ -77,6 +79,92 @@ describe("Authentication", () => {
           password: "short",
           fullName: "Test User",
         });
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe("POST /api/v1/auth/login", () => {
+    it("should login with valid credentials", async () => {
+      const response = await request(app).post("/api/v1/auth/login").send({
+        email: testEmail,
+        password: "StrongPassword123!",
+      });
+
+      expect(response.status).toBe(200);
+
+      expect(response.body.success).toBe(true);
+
+      expect(response.body.data).toHaveProperty("accessToken");
+
+      const token = response.body.data.accessToken;
+      expect(token).toEqual(expect.any(String));
+
+      const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as {
+        sub: string;
+        role: string;
+      };
+
+      expect(payload.sub).toBeDefined();
+      expect(payload.role).toBe("student");
+
+      expect(response.body.data.user).toMatchObject({
+        email: testEmail,
+        fullName: "Test User",
+        role: "student",
+        isActive: true,
+      });
+
+      expect(response.body.data.user).not.toHaveProperty("password");
+
+      expect(response.body.data.user).not.toHaveProperty("passwordHash");
+    });
+
+    it("should reject an incorrect password", async () => {
+      const response = await request(app).post("/api/v1/auth/login").send({
+        email: testEmail,
+        password: "WrongPassword123!",
+      });
+
+      expect(response.status).toBe(401);
+
+      expect(response.body).toMatchObject({
+        success: false,
+        error: {
+          code: "INVALID_CREDENTIALS",
+        },
+      });
+    });
+
+    it("should reject an unknown email", async () => {
+      const response = await request(app).post("/api/v1/auth/login").send({
+        email: "does-not-exist@example.com",
+        password: "StrongPassword123!",
+      });
+
+      expect(response.status).toBe(401);
+
+      expect(response.body).toMatchObject({
+        success: false,
+        error: {
+          code: "INVALID_CREDENTIALS",
+        },
+      });
+    });
+
+    it("should reject an invalid email", async () => {
+      const response = await request(app).post("/api/v1/auth/login").send({
+        email: "not-an-email",
+        password: "StrongPassword123!",
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("should reject a missing password", async () => {
+      const response = await request(app).post("/api/v1/auth/login").send({
+        email: testEmail,
+      });
 
       expect(response.status).toBe(400);
     });
