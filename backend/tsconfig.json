@@ -23,9 +23,9 @@
     "types": ["node"]
   },
   "include": [
-    "src/**/*.ts",
-    "drizzle.config.ts"
-  ],
+  "src",
+  "drizzle.config.ts"
+],
   "exclude": [
     "node_modules",
     "dist",

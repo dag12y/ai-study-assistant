@@ -99,3 +99,22 @@ export const loginUser = async (input: LoginInput) => {
     accessToken,
   };
 };
+
+export const getCurrentUser = async (userId: string) => {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+
+  if (!user) {
+    throw new AppError("User not found.", 404, "USER_NOT_FOUND");
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    role: user.role,
+    isActive: user.isActive,
+    createdAt: user.createdAt,
+  };
+};

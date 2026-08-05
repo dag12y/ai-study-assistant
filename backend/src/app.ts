@@ -32,7 +32,27 @@ app.use(
   }),
 );
 
-app.use(pinoHttp());
+if (env.NODE_ENV !== "test") {
+  app.use(
+    pinoHttp({
+      customLogLevel(req, res, error) {
+        if (req.url === "/" || req.url === "/api/v1/health") {
+          return "silent";
+        }
+
+        if (error || res.statusCode >= 500) {
+          return "error";
+        }
+
+        if (res.statusCode >= 400) {
+          return "warn";
+        }
+
+        return "debug";
+      },
+    }),
+  );
+}
 
 app.get("/", (_req, res) => {
   res.status(200).json({
