@@ -1,16 +1,20 @@
 import { eq } from "drizzle-orm";
-
+import ms, { type StringValue } from "ms";
 import { db } from "../../database/client.js";
 import { users } from "../../database/schema.js";
 import { AppError } from "../../lib/errors.js";
-
+import { env } from "../../config/env.js";
 import type { RegisterUserInput, PublicUser } from "./auth.types.js";
 
 import {
   generateAccessToken,
   hashPassword,
   verifyPassword,
+  generateRefreshToken,
+  hashRefreshToken,
 } from "./auth.utils.js";
+
+import { refreshTokens } from "../../database/schema.js";
 
 import type { LoginInput } from "./auth.schemas.js";
 
@@ -55,6 +59,39 @@ export const registerUser = async (
   return user;
 };
 
+type AuthTokens = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+const issueTokens = async (
+  user: Pick<typeof users.$inferSelect, "id" | "role">,
+): Promise<AuthTokens> => {
+  const accessToken = generateAccessToken({
+    sub: user.id,
+    role: user.role,
+  });
+
+  const refreshToken = generateRefreshToken({
+    sub: user.id,
+  });
+
+  const tokenHash = await hashRefreshToken(refreshToken);
+
+  const expiresAt = new Date(Date.now() + ms(env.JWT_REFRESH_EXPIRES_IN));
+
+  await db.insert(refreshTokens).values({
+    userId: user.id,
+    tokenHash,
+    expiresAt,
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+  };
+};
+
 export const loginUser = async (input: LoginInput) => {
   const user = await db.query.users.findFirst({
     where: eq(users.email, input.email),
@@ -82,10 +119,7 @@ export const loginUser = async (input: LoginInput) => {
     );
   }
 
-  const accessToken = generateAccessToken({
-    sub: user.id,
-    role: user.role,
-  });
+  const { accessToken, refreshToken } = await issueTokens(user);
 
   return {
     user: {
@@ -97,6 +131,7 @@ export const loginUser = async (input: LoginInput) => {
       createdAt: user.createdAt,
     },
     accessToken,
+    refreshToken,
   };
 };
 
