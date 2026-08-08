@@ -257,4 +257,88 @@ describe("Authentication", () => {
       });
     });
   });
+
+  describe("POST /api/v1/auth/refresh", () => {
+    it("should rotate refresh tokens and reject reuse of the old token", async () => {
+      await pool.query(`DELETE FROM refresh_tokens`);
+
+      const login = await request(app).post("/api/v1/auth/login").send({
+        email: authEmail,
+        password,
+      });
+
+      expect(login.status).toBe(200);
+
+      const refreshToken1 = login.body.data.refreshToken;
+
+      const firstRefresh = await request(app)
+        .post("/api/v1/auth/refresh")
+        .send({ refreshToken: refreshToken1 });
+
+      expect(firstRefresh.status).toBe(200);
+
+      const refreshToken2 = firstRefresh.body.data.refreshToken;
+
+      const reusedOldToken = await request(app)
+        .post("/api/v1/auth/refresh")
+        .send({ refreshToken: refreshToken1 });
+
+      expect(reusedOldToken.status).toBe(401);
+
+      expect(reusedOldToken.body).toMatchObject({
+        success: false,
+        error: {
+          code: "INVALID_REFRESH_TOKEN",
+        },
+      });
+
+      const secondRefresh = await request(app)
+        .post("/api/v1/auth/refresh")
+        .send({ refreshToken: refreshToken2 });
+
+      expect(secondRefresh.status).toBe(200);
+      expect(secondRefresh.body.data).toHaveProperty("accessToken");
+      expect(secondRefresh.body.data).toHaveProperty("refreshToken");
+    });
+  });
+
+  describe("POST /api/v1/auth/logout", () => {
+    it("should invalidate the refresh token after logout", async () => {
+      await pool.query(`DELETE FROM refresh_tokens`);
+
+      const login = await request(app).post("/api/v1/auth/login").send({
+        email: authEmail,
+        password,
+      });
+
+      expect(login.status).toBe(200);
+
+      const refreshToken = login.body.data.refreshToken;
+
+      const logout = await request(app)
+        .post("/api/v1/auth/logout")
+        .send({ refreshToken });
+
+      expect(logout.status).toBe(200);
+      expect(logout.body).toMatchObject({
+        success: true,
+        data: null,
+      });
+
+      const refreshAfterLogout = await request(app)
+        .post("/api/v1/auth/refresh")
+        .send({ refreshToken });
+
+      expect(refreshAfterLogout.status).toBe(401);
+
+      expect(refreshAfterLogout.body).toMatchObject({
+        success: false,
+        error: {
+          code: "INVALID_REFRESH_TOKEN",
+        },
+      });
+    });
+  });
+
 });
+

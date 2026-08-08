@@ -16,7 +16,11 @@ import {
   verifyRefreshTokenHash,
 } from "./auth.utils.js";
 
-import type { LoginInput, RefreshTokenInput } from "./auth.schemas.js";
+import type {
+  LoginInput,
+  RefreshTokenInput,
+  LogoutInput,
+} from "./auth.schemas.js";
 
 export const registerUser = async (
   input: RegisterUserInput,
@@ -183,6 +187,31 @@ export const refreshSession = async (input: RefreshTokenInput) => {
     }
 
     return await issueTokens(user);
+  }
+
+  throw new AppError("Invalid refresh token.", 401, "INVALID_REFRESH_TOKEN");
+};
+
+export const logoutUser = async (input: LogoutInput): Promise<void> => {
+  const payload = verifyRefreshToken(input.refreshToken);
+
+  const sessions = await db.query.refreshTokens.findMany({
+    where: eq(refreshTokens.userId, payload.sub),
+  });
+
+  for (const session of sessions) {
+    const valid = await verifyRefreshTokenHash(
+      session.tokenHash,
+      input.refreshToken,
+    );
+
+    if (!valid) {
+      continue;
+    }
+
+    await db.delete(refreshTokens).where(eq(refreshTokens.id, session.id));
+
+    return;
   }
 
   throw new AppError("Invalid refresh token.", 401, "INVALID_REFRESH_TOKEN");

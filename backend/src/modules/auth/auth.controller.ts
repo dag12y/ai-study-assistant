@@ -3,6 +3,7 @@ import {
   loginSchema,
   refreshTokenSchema,
   registerSchema,
+  logoutSchema,
 } from "./auth.schemas.js";
 
 import {
@@ -10,6 +11,7 @@ import {
   registerUser,
   getCurrentUser,
   refreshSession,
+  logoutUser,
 } from "./auth.service.js";
 
 export const register: RequestHandler = async (req, res, next) => {
@@ -70,6 +72,22 @@ export const refresh: RequestHandler = async (req, res, next) => {
       success: true,
       data: tokens,
       message: "Tokens refreshed successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout: RequestHandler = async (req, res, next) => {
+  try {
+    const input = logoutSchema.parse(req.body);
+
+    await logoutUser(input);
+
+    res.status(200).json({
+      success: true,
+      data: null,
+      message: "Logged out successfully.",
     });
   } catch (error) {
     next(error);
