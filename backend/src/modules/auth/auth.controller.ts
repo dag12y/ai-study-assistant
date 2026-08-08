@@ -1,8 +1,16 @@
 import type { RequestHandler } from "express";
+import {
+  loginSchema,
+  refreshTokenSchema,
+  registerSchema,
+} from "./auth.schemas.js";
 
-import { loginSchema, registerSchema } from "./auth.schemas.js";
-
-import { loginUser, registerUser,getCurrentUser } from "./auth.service.js";
+import {
+  loginUser,
+  registerUser,
+  getCurrentUser,
+  refreshSession,
+} from "./auth.service.js";
 
 export const register: RequestHandler = async (req, res, next) => {
   try {
@@ -46,6 +54,22 @@ export const me: RequestHandler = async (req, res, next) => {
       success: true,
       data: user,
       message: "User retrieved successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refresh: RequestHandler = async (req, res, next) => {
+  try {
+    const input = refreshTokenSchema.parse(req.body);
+
+    const tokens = await refreshSession(input);
+
+    res.status(200).json({
+      success: true,
+      data: tokens,
+      message: "Tokens refreshed successfully.",
     });
   } catch (error) {
     next(error);

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import ms, { type StringValue } from "ms";
 import { db } from "../../database/client.js";
-import { users } from "../../database/schema.js";
+import { users, refreshTokens } from "../../database/schema.js";
 import { AppError } from "../../lib/errors.js";
 import { env } from "../../config/env.js";
 import type { RegisterUserInput, PublicUser } from "./auth.types.js";
@@ -12,11 +12,11 @@ import {
   verifyPassword,
   generateRefreshToken,
   hashRefreshToken,
+  verifyRefreshToken,
+  verifyRefreshTokenHash,
 } from "./auth.utils.js";
 
-import { refreshTokens } from "../../database/schema.js";
-
-import type { LoginInput } from "./auth.schemas.js";
+import type { LoginInput, RefreshTokenInput } from "./auth.schemas.js";
 
 export const registerUser = async (
   input: RegisterUserInput,
@@ -152,4 +152,38 @@ export const getCurrentUser = async (userId: string) => {
     isActive: user.isActive,
     createdAt: user.createdAt,
   };
+};
+
+export const refreshSession = async (input: RefreshTokenInput) => {
+  const payload = verifyRefreshToken(input.refreshToken);
+  const sessions = await db.query.refreshTokens.findMany({
+    where: eq(refreshTokens.userId, payload.sub),
+  });
+  if (sessions.length === 0) {
+    throw new AppError("Invalid refresh token.", 401, "INVALID_REFRESH_TOKEN");
+  }
+  for (const session of sessions) {
+    const valid = await verifyRefreshTokenHash(
+      session.tokenHash,
+      input.refreshToken,
+    );
+
+    if (!valid) {
+      continue;
+    }
+
+    await db.delete(refreshTokens).where(eq(refreshTokens.id, session.id));
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, payload.sub),
+    });
+
+    if (!user) {
+      throw new AppError("User not found.", 404, "USER_NOT_FOUND");
+    }
+
+    return await issueTokens(user);
+  }
+
+  throw new AppError("Invalid refresh token.", 401, "INVALID_REFRESH_TOKEN");
 };

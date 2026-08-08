@@ -1,4 +1,5 @@
 import argon2 from "argon2";
+import crypto from "node:crypto";
 import jwt, {
   JwtPayload,
   JsonWebTokenError,
@@ -94,6 +95,7 @@ export const generateRefreshToken = (payload: RefreshTokenPayload): string => {
   return jwt.sign(
     {
       sub: payload.sub,
+      jti: crypto.randomUUID(),
     },
     env.JWT_REFRESH_SECRET,
     {
