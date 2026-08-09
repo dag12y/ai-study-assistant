@@ -13,6 +13,17 @@ describe("Authentication", () => {
   const registerEmail = `register-${Date.now()}@example.com`;
   const authEmail = `auth-${Date.now()}@example.com`;
   const password = "StrongPassword123!";
+  const seededEmails = new Set<string>();
+
+  const deleteUsersByEmail = async (emails: string[]) => {
+    if (emails.length === 0) {
+      return;
+    }
+
+    await pool.query(`DELETE FROM users WHERE email = ANY($1::text[])`, [
+      emails,
+    ]);
+  };
 
   const seedUser = async (email: string, fullName: string) => {
     const passwordHash = await hashPassword(password);
@@ -23,22 +34,18 @@ describe("Authentication", () => {
       fullName,
       role: "student",
     });
+
+    seededEmails.add(email);
   };
 
   beforeAll(async () => {
-    await pool.query(`DELETE FROM users WHERE email IN ($1, $2)`, [
-      registerEmail,
-      authEmail,
-    ]);
+    await deleteUsersByEmail([registerEmail, authEmail]);
 
     await seedUser(authEmail, "Auth User");
   });
 
   afterAll(async () => {
-    await pool.query(`DELETE FROM users WHERE email IN ($1, $2)`, [
-      registerEmail,
-      authEmail,
-    ]);
+    await deleteUsersByEmail([registerEmail, authEmail, ...seededEmails]);
 
     await pool.end();
   });
@@ -339,6 +346,4 @@ describe("Authentication", () => {
       });
     });
   });
-
 });
-
