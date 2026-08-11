@@ -1,10 +1,23 @@
 import type { ErrorRequestHandler } from "express";
+import { MulterError } from "multer";
 
 import { ZodError } from "zod";
 
 import { AppError } from "../lib/errors.js";
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+  if (error instanceof MulterError && error.code === "LIMIT_FILE_SIZE") {
+    res.status(400).json({
+      success: false,
+      error: {
+        code: "FILE_TOO_LARGE",
+        message: "The uploaded file exceeds the allowed size.",
+      },
+    });
+
+    return;
+  }
+
   if (error instanceof ZodError) {
     res.status(400).json({
       success: false,

@@ -18,9 +18,9 @@ import { relations } from "drizzle-orm";
 export const userRoleEnum = pgEnum("user_role", ["student", "admin"]);
 
 export const documentStatusEnum = pgEnum("document_status", [
-  "pending",
+  "uploaded",
   "processing",
-  "completed",
+  "ready",
   "failed",
 ]);
 
@@ -151,8 +151,8 @@ export const documents = pgTable(
 
     storageKey: text("storage_key").notNull().unique(),
 
-    status: documentStatusEnum("status").notNull().default("pending"),
-
+    status: documentStatusEnum("status").notNull().default("uploaded"),
+    
     errorMessage: text("error_message"),
 
     createdAt: timestamp("created_at", {

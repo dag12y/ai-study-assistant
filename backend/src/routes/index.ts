@@ -1,6 +1,7 @@
 import { Router } from "express";
 import authRoutes from "../modules/auth/auth.routes.js";
 import workspaceRoutes from "../modules/workspaces/workspace.routes.js";
+import documentRouter from "../modules/documents/document.routes.js";
 
 const router = Router();
 
@@ -18,7 +19,9 @@ router.get(
   }
 );
 
-router.use('/auth', authRoutes);
-router.use('/workspaces', workspaceRoutes);
+router.use("/auth", authRoutes);
+router.use("/workspaces", workspaceRoutes);
+router.use("/documents", documentRouter);
+
 
 export default router;

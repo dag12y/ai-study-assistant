@@ -8,6 +8,13 @@
       "when": 1785660391845,
       "tag": "0000_quick_albert_cleary",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786463420813,
+      "tag": "0001_serious_betty_ross",
+      "breakpoints": true
     }
   ]
 }
