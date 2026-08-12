@@ -152,7 +152,7 @@ export const documents = pgTable(
     storageKey: text("storage_key").notNull().unique(),
 
     status: documentStatusEnum("status").notNull().default("uploaded"),
-    
+
     errorMessage: text("error_message"),
 
     createdAt: timestamp("created_at", {
@@ -193,6 +193,8 @@ export const documentChunks = pgTable(
 
     chunkIndex: integer("chunk_index").notNull(),
 
+    pageNumber: integer("page_number").notNull(),
+
     tokenCount: integer("token_count"),
 
     embedding: vector("embedding", {
@@ -207,6 +209,7 @@ export const documentChunks = pgTable(
   },
   (table) => [
     index("document_chunks_document_id_idx").on(table.documentId),
+
     unique("document_chunks_document_id_chunk_index_unique").on(
       table.documentId,
       table.chunkIndex,

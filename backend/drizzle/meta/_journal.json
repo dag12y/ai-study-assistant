@@ -15,6 +15,13 @@
       "when": 1786463420813,
       "tag": "0001_serious_betty_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786563407958,
+      "tag": "0002_yummy_millenium_guard",
+      "breakpoints": true
     }
   ]
 }

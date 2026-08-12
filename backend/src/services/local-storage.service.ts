@@ -1,4 +1,4 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -29,6 +29,21 @@ export const localStorageService: StorageService = {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         throw error;
       }
+    }
+  },
+  
+  async download(storageKey: string): Promise<Buffer> {
+    const fileName = path.basename(storageKey);
+    const filePath = path.join(uploadDirectory, fileName);
+
+    try {
+      return await readFile(filePath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new Error("Stored file not found.");
+      }
+
+      throw error;
     }
   },
 };

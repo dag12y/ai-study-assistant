@@ -4,7 +4,8 @@ export type UploadFileInput = {
   mimeType: string;
 };
 
-export type StorageService = {
-  upload: (input: UploadFileInput) => Promise<string>;
-  delete: (storageKey: string) => Promise<void>;
-};
+export interface StorageService {
+  upload(input: UploadFileInput): Promise<string>;
+  download(storageKey: string): Promise<Buffer>;
+  delete(storageKey: string): Promise<void>;
+}
