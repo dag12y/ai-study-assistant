@@ -21,24 +21,55 @@ export const processDocument = async (documentId: string) => {
     throw new AppError("Document not found.", 404, "DOCUMENT_NOT_FOUND");
   }
 
-  const pdfBuffer = await localStorageService.download(document.storageKey);
+  await db
+    .update(documents)
+    .set({
+      status: "processing",
+      updatedAt: new Date(),
+    })
+    .where(eq(documents.id, documentId));
+  try {
+    const pdfBuffer = await localStorageService.download(document.storageKey);
 
-  const pages = await extractPdfText(pdfBuffer);
+    const pages = await extractPdfText(pdfBuffer);
 
-  const chunks = chunkDocument(pages);
+    const chunks = chunkDocument(pages);
 
-  await db.insert(documentChunks).values(
-    chunks.map((chunk) => ({
-      documentId: document.id,
-      content: chunk.content,
-      chunkIndex: chunk.chunkIndex,
-      pageNumber: chunk.pageNumber,
-    })),
-  );
+    await db.insert(documentChunks).values(
+      chunks.map((chunk) => ({
+        documentId: document.id,
+        content: chunk.content,
+        chunkIndex: chunk.chunkIndex,
+        pageNumber: chunk.pageNumber,
+      })),
+    );
 
-  return {
-    document,
-    pages,
-    chunks,
-  };
+    await db
+      .update(documents)
+      .set({
+        status: "ready",
+        updatedAt: new Date(),
+      })
+      .where(eq(documents.id, documentId));
+
+    return {
+      document,
+      pages,
+      chunks,
+    };
+  } catch (error) {
+    await db
+      .update(documents)
+      .set({
+        status: "failed",
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Document processing failed.",
+        updatedAt: new Date(),
+      })
+      .where(eq(documents.id, documentId));
+
+    throw error;
+  }
 };

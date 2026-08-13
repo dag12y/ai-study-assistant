@@ -117,6 +117,15 @@ describe("Document Processing", () => {
 
     const result = await processDocument(documentId);
 
+    const [processedDocument] = await db
+      .select({
+        status: documents.status,
+      })
+      .from(documents)
+      .where(eq(documents.id, documentId));
+
+    expect(processedDocument?.status).toBe("ready");
+
     expect(result.document.id).toBe(documentId);
     expect(result.pages.length).toBeGreaterThan(0);
     expect(result.chunks.length).toBeGreaterThan(0);
@@ -136,5 +145,50 @@ describe("Document Processing", () => {
         }),
       ]),
     );
+  });
+
+  it("should mark the document as failed when processing fails", async () => {
+    const [document] = await db
+      .insert(documents)
+      .values({
+        workspaceId,
+        uploadedBy: userId,
+        title: "Failed Processing Test Document",
+        originalFileName: "missing.pdf",
+        mimeType: "application/pdf",
+        fileSize: 0,
+        storageKey: "documents/nonexistent-file.pdf",
+        status: "uploaded",
+      })
+      .returning({
+        id: documents.id,
+      });
+
+    if (!document) {
+      throw new Error("Failed to create test document.");
+    }
+
+    const failedDocumentId = document.id;
+
+    try {
+      await processDocument(failedDocumentId);
+
+      throw new Error("Expected document processing to fail.");
+    } catch (error) {
+      expect(error).toBeDefined();
+    }
+
+    const [failedDocument] = await db
+      .select({
+        status: documents.status,
+        errorMessage: documents.errorMessage,
+      })
+      .from(documents)
+      .where(eq(documents.id, failedDocumentId));
+
+    expect(failedDocument?.status).toBe("failed");
+    expect(failedDocument?.errorMessage).toBeTruthy();
+
+    await db.delete(documents).where(eq(documents.id, failedDocumentId));
   });
 });
