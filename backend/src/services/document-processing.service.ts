@@ -6,6 +6,7 @@ import { AppError } from "../lib/errors.js";
 import { localStorageService } from "./local-storage.service.js";
 import { extractPdfText } from "./pdf-extractor.service.js";
 import { chunkDocument } from "./document-chunking.service.js";
+import { generateDocumentEmbedding } from "./embedding.service.js";
 
 export const processDocument = async (documentId: string) => {
   const [document] = await db
@@ -35,12 +36,24 @@ export const processDocument = async (documentId: string) => {
 
     const chunks = chunkDocument(pages);
 
+    const chunksWithEmbeddings = await Promise.all(
+      chunks.map(async (chunk) => {
+        const embedding = await generateDocumentEmbedding(chunk.content);
+
+        return {
+          ...chunk,
+          embedding,
+        };
+      }),
+    );
+
     await db.insert(documentChunks).values(
-      chunks.map((chunk) => ({
+      chunksWithEmbeddings.map((chunk) => ({
         documentId: document.id,
         content: chunk.content,
         chunkIndex: chunk.chunkIndex,
         pageNumber: chunk.pageNumber,
+        embedding: chunk.embedding,
       })),
     );
 

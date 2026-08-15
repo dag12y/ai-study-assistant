@@ -145,6 +145,14 @@ describe("Document Processing", () => {
         }),
       ]),
     );
+
+    for (const chunk of savedChunks) {
+      expect(chunk.embedding).toBeDefined();
+      expect(chunk.embedding).toHaveLength(512);
+      expect(chunk.embedding?.every((value) => typeof value === "number")).toBe(
+        true,
+      );
+    }
   });
 
   it("should mark the document as failed when processing fails", async () => {

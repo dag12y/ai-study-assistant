@@ -211,7 +211,7 @@ describe("Documents", () => {
 
       let status = "uploaded";
 
-      for (let attempt = 0; attempt < 20; attempt++) {
+      for (let attempt = 0; attempt < 60; attempt++) {
         const statusResponse = await request(app)
           .get(`/api/v1/documents/${documentId}/status`)
           .set("Authorization", `Bearer ${accessToken}`);
