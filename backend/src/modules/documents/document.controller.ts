@@ -8,6 +8,7 @@ import {
   listDocumentsForWorkspace,
 } from "./document.service.js";
 import { createDocumentSchema } from "./document.schemas.js";
+import { processDocument } from "../../services/document-processing.service.js";
 
 export const listDocuments: RequestHandler = async (req, res, next) => {
   try {
@@ -48,6 +49,13 @@ export const uploadDocument: RequestHandler = async (req, res, next) => {
       input,
       req.file,
     );
+
+    void processDocument(document.id).catch((error) => {
+      console.error(
+        `Background processing failed for document ${document.id}:`,
+        error,
+      );
+    });
 
     res.status(201).json({
       success: true,

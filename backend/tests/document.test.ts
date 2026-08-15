@@ -1,12 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import request from "supertest";
-import fs from "node:fs/promises";
+import fs, { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import app from "../src/app.js";
 import { db, pool } from "../src/database/client.js";
-import { users, documents, workspaces } from "../src/database/schema.js";
+import {
+  users,
+  documents,
+  workspaces,
+  documentChunks,
+} from "../src/database/schema.js";
 import { hashPassword } from "../src/modules/auth/auth.utils.js";
 import { eq } from "drizzle-orm";
 
@@ -180,6 +185,60 @@ describe("Documents", () => {
       expect(stat.isFile()).toBe(true);
     });
 
+    it("should upload a PDF and process it in the background", async () => {
+      const pdfBuffer = await readFile(
+        path.resolve(process.cwd(), "tests/fixtures/amharic-test.pdf"),
+      );
+
+      const response = await request(app)
+        .post(`/api/v1/workspaces/${workspaceId}/documents`)
+        .set("Authorization", `Bearer ${accessToken}`)
+        .field("title", "Background Processing Test")
+        .attach("file", pdfBuffer, {
+          filename: "amharic-test.pdf",
+          contentType: "application/pdf",
+        });
+
+      expect(response.status).toBe(201);
+
+      const documentId = response.body.data.document.id;
+
+      expect(response.body.data.document).toMatchObject({
+        id: documentId,
+        title: "Background Processing Test",
+        status: "uploaded",
+      });
+
+      let status = "uploaded";
+
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const statusResponse = await request(app)
+          .get(`/api/v1/documents/${documentId}/status`)
+          .set("Authorization", `Bearer ${accessToken}`);
+
+        expect(statusResponse.status).toBe(200);
+
+        status = statusResponse.body.data.status;
+
+        if (status === "ready" || status === "failed") {
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      expect(status).toBe("ready");
+
+      const chunks = await db
+        .select()
+        .from(documentChunks)
+        .where(eq(documentChunks.documentId, documentId));
+
+      expect(chunks.length).toBeGreaterThan(0);
+
+      await db.delete(documents).where(eq(documents.id, documentId));
+    });
+
     it("rejects upload without file", async () => {
       const res = await request(app)
         .post(`/api/v1/workspaces/${workspaceId}/documents`)
@@ -280,15 +339,45 @@ describe("Documents", () => {
 
   describe("GET /api/v1/documents/:documentId/status", () => {
     it("returns status for owner", async () => {
-      const res = await request(app)
-        .get(`/api/v1/documents/${documentId}/status`)
-        .set("Authorization", `Bearer ${accessToken}`);
+      const pdf = await readFile(
+        path.resolve(process.cwd(), "tests/fixtures/amharic-test.pdf"),
+      );
 
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data).toMatchObject({ documentId, status: "uploaded" });
+      const upload = await request(app)
+        .post(`/api/v1/workspaces/${workspaceId}/documents`)
+        .set("Authorization", `Bearer ${accessToken}`)
+        .field("title", "Status Test Document")
+        .attach("file", pdf, {
+          filename: "status-test.pdf",
+          contentType: "application/pdf",
+        });
+
+      expect(upload.status).toBe(201);
+
+      documentId = upload.body.data.document.id;
+
+      let status = "uploaded";
+
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const res = await request(app)
+          .get(`/api/v1/documents/${documentId}/status`)
+          .set("Authorization", `Bearer ${accessToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.documentId).toBe(documentId);
+
+        status = res.body.data.status;
+
+        if (status === "ready" || status === "failed") {
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      expect(status).toBe("ready");
     });
-
     it("rejects unauthenticated", async () => {
       const res = await request(app).get(
         `/api/v1/documents/${documentId}/status`,
