@@ -20,8 +20,8 @@ import { searchSimilarChunks } from "../src/services/vector-search.service.js";
 describe("Vector search", () => {
   let userId: string;
   let workspaceId: string;
-  let documentId: string;
-  let storageKey: string;
+  let documentId: string | undefined;
+  let storageKey: string | undefined;
 
   beforeAll(async () => {
     const passwordHash = await hashPassword("StrongPassword123!");
@@ -88,7 +88,7 @@ describe("Vector search", () => {
 
     const pdfBuffer = await readFile(fixturePath);
 
-    const storageKey = await localStorageService.upload({
+    storageKey = await localStorageService.upload({
       buffer: pdfBuffer,
       originalName: "amharic-vector-search-test.pdf",
       mimeType: "application/pdf",
@@ -113,6 +113,7 @@ describe("Vector search", () => {
     if (!document) {
       throw new Error("Failed to create test document.");
     }
+    documentId = document.id;
 
     try {
       await processDocument(document.id);

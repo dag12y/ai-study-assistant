@@ -24,6 +24,7 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.custom<StringValue>(),
   GROQ_API_KEY: z.string().min(1, "GROQ_API_KEY is required"),
+  GROQ_MODEL: z.string().default("openai/gpt-oss-120b"),
   COHERE_API_KEY: z.string().min(1, "COHERE_API_KEY is required"),
 });
 
