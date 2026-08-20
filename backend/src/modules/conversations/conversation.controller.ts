@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { Request, Response, RequestHandler } from "express";
 
 import {
   createConversation,
@@ -10,7 +10,12 @@ import {
 import {
   createConversationSchema,
   conversationIdSchema,
+  createConversationMessageSchema,
 } from "./conversation.schemas.js";
+
+import { createMessage, listMessages } from "./conversation.message.service.js";
+
+import { AppError } from "../../lib/errors.js";
 
 export const createConversationController = async (
   req: Request,
@@ -84,4 +89,60 @@ export const deleteConversationController = async (
   }
 
   res.status(204).send();
+};
+
+export const createMessageController: RequestHandler = async (
+  req,
+  res,
+  next,
+) => {
+  try {
+    const { conversationId } = conversationIdSchema.parse(req.params);
+
+    const parsed = createConversationMessageSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      throw new AppError("Invalid request body.", 400, "VALIDATION_ERROR");
+    }
+
+    if (!req.user) {
+      throw new AppError("Authentication required.", 401, "UNAUTHORIZED");
+    }
+
+    const result = await createMessage(
+      conversationId,
+      req.user.id,
+      parsed.data.content,
+    );
+
+    res.status(201).json({
+      message: result.assistantMessage,
+      userMessage: result.userMessage,
+      sources: result.sources,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listMessagesController: RequestHandler = async (
+  req,
+  res,
+  next,
+) => {
+  try {
+    const { conversationId } = conversationIdSchema.parse(req.params);
+
+    if (!req.user) {
+      throw new AppError("Authentication required.", 401, "UNAUTHORIZED");
+    }
+
+    const messages = await listMessages(conversationId, req.user.id);
+
+    res.status(200).json({
+      messages,
+    });
+  } catch (error) {
+    next(error);
+  }
 };

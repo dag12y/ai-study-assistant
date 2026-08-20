@@ -7,6 +7,8 @@ import {
   listConversationsController,
   getConversationController,
   deleteConversationController,
+  createMessageController,
+  listMessagesController,
 } from "./conversation.controller.js";
 
 const router = Router();
@@ -20,5 +22,9 @@ router.get("/", listConversationsController);
 router.get("/:conversationId", getConversationController);
 
 router.delete("/:conversationId", deleteConversationController);
+
+router.post("/:conversationId/messages", createMessageController);
+
+router.get("/:conversationId/messages", listMessagesController);
 
 export default router;
