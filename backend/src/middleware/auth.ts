@@ -13,9 +13,10 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
       throw new AppError("Authentication required.", 401, "UNAUTHORIZED");
     }
 
-    const [scheme, token] = authorization.split(" ");
+    const parts = authorization.trim().split(/\s+/);
+    const [scheme, token] = parts;
 
-    if (scheme !== "Bearer" || !token) {
+    if (parts.length !== 2 || scheme !== "Bearer" || !token) {
       throw new AppError("Invalid authorization header.", 401, "INVALID_TOKEN");
     }
 

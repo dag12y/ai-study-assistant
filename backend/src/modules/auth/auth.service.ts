@@ -186,6 +186,10 @@ export const refreshSession = async (input: RefreshTokenInput) => {
       throw new AppError("User not found.", 404, "USER_NOT_FOUND");
     }
 
+    if (!user.isActive) {
+      throw new AppError("Account is inactive.", 403, "ACCOUNT_INACTIVE");
+    }
+
     return await issueTokens(user);
   }
 

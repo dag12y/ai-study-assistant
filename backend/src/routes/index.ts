@@ -8,8 +8,14 @@ import {
   listUserDocuments,
   uploadUserDocument,
 } from "../modules/documents/document.controller.js";
+import { createRateLimiter } from "../middleware/rate-limit.js";
+import { env } from "../config/env.js";
 
 const router = Router();
+const uploadRateLimiter = createRateLimiter({
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: env.RATE_LIMIT_UPLOAD_MAX,
+});
 
 router.get("/health", (_req, res) => {
   res.status(200).json({
@@ -28,6 +34,7 @@ router.use("/documents", documentRouter);
 router.get("/documents", listUserDocuments);
 router.post(
   "/documents",
+  uploadRateLimiter,
   uploadDocumentFile.single("file"),
   uploadUserDocument,
 );

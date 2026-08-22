@@ -1,6 +1,8 @@
 import { Router } from "express";
 
 import { authenticate } from "../../middleware/auth.js";
+import { createRateLimiter } from "../../middleware/rate-limit.js";
+import { env } from "../../config/env.js";
 
 import {
   createConversationController,
@@ -12,6 +14,10 @@ import {
 } from "./conversation.controller.js";
 
 const router = Router();
+const messageRateLimiter = createRateLimiter({
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: env.RATE_LIMIT_AI_MAX,
+});
 
 router.use(authenticate);
 
@@ -23,7 +29,11 @@ router.get("/:conversationId", getConversationController);
 
 router.delete("/:conversationId", deleteConversationController);
 
-router.post("/:conversationId/messages", createMessageController);
+router.post(
+  "/:conversationId/messages",
+  messageRateLimiter,
+  createMessageController,
+);
 
 router.get("/:conversationId/messages", listMessagesController);
 

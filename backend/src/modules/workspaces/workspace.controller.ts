@@ -3,6 +3,7 @@ import type { RequestHandler } from "express";
 import {
   createWorkspaceSchema,
   updateWorkspaceSchema,
+  workspaceIdSchema,
 } from "./workspace.schemas.js";
 
 import {
@@ -45,7 +46,8 @@ export const list: RequestHandler = async (req, res, next) => {
 
 export const get: RequestHandler = async (req, res, next) => {
   try {
-    const workspace = await getWorkspace(req.user!.id, req.params.workspaceId as string);
+    const { workspaceId } = workspaceIdSchema.parse(req.params);
+    const workspace = await getWorkspace(req.user!.id, workspaceId);
 
     res.status(200).json({
       success: true,
@@ -60,10 +62,11 @@ export const get: RequestHandler = async (req, res, next) => {
 export const update: RequestHandler = async (req, res, next) => {
   try {
     const input = updateWorkspaceSchema.parse(req.body);
+    const { workspaceId } = workspaceIdSchema.parse(req.params);
 
     const workspace = await updateWorkspace(
       req.user!.id,
-      req.params.workspaceId as string,
+      workspaceId,
       input,
     );
 
@@ -79,7 +82,8 @@ export const update: RequestHandler = async (req, res, next) => {
 
 export const remove: RequestHandler = async (req, res, next) => {
   try {
-    await deleteWorkspace(req.user!.id, req.params.workspaceId as string);
+    const { workspaceId } = workspaceIdSchema.parse(req.params);
+    await deleteWorkspace(req.user!.id, workspaceId);
 
     res.status(200).json({
       success: true,

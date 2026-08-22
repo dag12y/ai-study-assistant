@@ -13,13 +13,15 @@ import {
   documentIdSchema,
   listDocumentsQuerySchema,
 } from "./document.schemas.js";
+import { workspaceIdSchema } from "../workspaces/workspace.schemas.js";
 import { processDocument } from "../../services/document-processing.service.js";
 
 export const listDocuments: RequestHandler = async (req, res, next) => {
   try {
+    const { workspaceId } = workspaceIdSchema.parse(req.params);
     const documents = await listDocumentsForWorkspace(
       req.user!.id,
-      req.params.workspaceId as string,
+      workspaceId,
     );
 
     res.status(200).json({
@@ -50,6 +52,7 @@ export const listUserDocuments: RequestHandler = async (req, res, next) => {
 export const uploadDocument: RequestHandler = async (req, res, next) => {
   try {
     const input = createDocumentSchema.parse(req.body);
+    const { workspaceId } = workspaceIdSchema.parse(req.params);
 
     if (!req.file) {
       res.status(400).json({
@@ -63,7 +66,7 @@ export const uploadDocument: RequestHandler = async (req, res, next) => {
     }
 
     const document = await createDocument(
-      req.params.workspaceId as string,
+      workspaceId,
       req.user!.id,
       input,
       req.file,

@@ -10,7 +10,7 @@ export const localStorageService: StorageService = {
   async upload(input: UploadFileInput): Promise<string> {
     await mkdir(uploadDirectory, { recursive: true });
 
-    const storageKey = `documents/${randomUUID()}-${input.originalName}`;
+    const storageKey = `documents/${randomUUID()}.pdf`;
 
     const filePath = path.join(uploadDirectory, path.basename(storageKey));
 

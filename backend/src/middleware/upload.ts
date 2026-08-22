@@ -9,7 +9,10 @@ export const uploadDocument = multer({
   },
 
   fileFilter: (_req, file, callback) => {
-    if (file.mimetype !== "application/pdf") {
+    if (
+      file.mimetype !== "application/pdf" ||
+      !file.originalname.toLowerCase().endsWith(".pdf")
+    ) {
       callback(
         new AppError("Only PDF files are allowed.", 400, "INVALID_FILE_TYPE"),
       );

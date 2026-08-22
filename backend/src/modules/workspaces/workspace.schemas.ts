@@ -10,6 +10,10 @@ export const updateWorkspaceSchema = z.object({
   description: z.string().trim().max(500).nullable().optional(),
 });
 
+export const workspaceIdSchema = z.object({
+  workspaceId: z.string().uuid(),
+});
+
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;

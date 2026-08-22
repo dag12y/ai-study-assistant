@@ -50,7 +50,7 @@ export const generateChatCompletion = async (
     return content;
   } catch (error) {
     throw new AppError(
-      error instanceof Error ? error.message : "LLM generation failed.",
+      "LLM provider is unavailable.",
       502,
       "LLM_GENERATION_FAILED",
     );

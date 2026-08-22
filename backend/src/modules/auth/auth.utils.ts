@@ -6,6 +6,7 @@ import jwt, {
   TokenExpiredError,
 } from "jsonwebtoken";
 import type { SignOptions } from "jsonwebtoken";
+import { z } from "zod";
 
 import { env } from "../../config/env.js";
 import { AppError } from "../../lib/errors.js";
@@ -53,6 +54,7 @@ export const verifyAccessToken = (token: string): AccessTokenPayload => {
 
     if (
       typeof payload.sub !== "string" ||
+      !z.string().uuid().safeParse(payload.sub).success ||
       (payload.role !== "student" && payload.role !== "admin")
     ) {
       throw new AppError("Invalid access token.", 401, "INVALID_TOKEN");
@@ -110,7 +112,10 @@ export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
   try {
     const payload = jwt.verify(token, env.JWT_REFRESH_SECRET) as JwtPayload;
 
-    if (typeof payload.sub !== "string") {
+    if (
+      typeof payload.sub !== "string" ||
+      !z.string().uuid().safeParse(payload.sub).success
+    ) {
       throw new AppError(
         "Invalid refresh token.",
         401,

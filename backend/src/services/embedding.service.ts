@@ -49,7 +49,7 @@ export const generateDocumentEmbedding = async (
     }
 
     throw new AppError(
-      error instanceof Error ? error.message : "Embedding generation failed.",
+      "Embedding provider is unavailable.",
       502,
       "EMBEDDING_GENERATION_FAILED",
     );
