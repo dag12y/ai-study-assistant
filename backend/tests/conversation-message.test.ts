@@ -1,18 +1,34 @@
 // tests/conversation-message.test.ts
 
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it, beforeAll, afterAll, vi } from "vitest";
 import request from "supertest";
 import { eq } from "drizzle-orm";
 
+vi.mock("../src/services/rag.service.js", () => ({
+  generateRagAnswer: vi.fn(),
+}));
+
 import app from "../src/app.js";
 import { db, pool } from "../src/database/client.js";
-import { users, conversations, messages } from "../src/database/schema.js";
+import {
+  users,
+  workspaces,
+  documents,
+  documentChunks,
+  conversations,
+  messages,
+  messageSources,
+} from "../src/database/schema.js";
 import { hashPassword } from "../src/modules/auth/auth.utils.js";
+import { generateRagAnswer } from "../src/services/rag.service.js";
 
 describe("Conversation Messages API", () => {
   let userId: string;
   let otherUserId: string;
   let conversationId: string;
+  let workspaceId: string;
+  let documentId: string;
+  let chunkId: string;
 
   let accessToken: string;
   let otherAccessToken: string;
@@ -64,6 +80,50 @@ describe("Conversation Messages API", () => {
 
     conversationId = conversation.id;
 
+    const [workspace] = await db
+      .insert(workspaces)
+      .values({
+        ownerId: userId,
+        name: "Message Test Workspace",
+      })
+      .returning({ id: workspaces.id });
+
+    if (!workspace) throw new Error("Failed to create test workspace.");
+
+    workspaceId = workspace.id;
+
+    const [document] = await db
+      .insert(documents)
+      .values({
+        workspaceId,
+        uploadedBy: userId,
+        title: "Message Test Document",
+        originalFileName: "message-test.txt",
+        mimeType: "text/plain",
+        fileSize: 1,
+        storageKey: `message-test-${Date.now()}.txt`,
+        status: "ready",
+      })
+      .returning({ id: documents.id });
+
+    if (!document) throw new Error("Failed to create test document.");
+
+    documentId = document.id;
+
+    const [chunk] = await db
+      .insert(documentChunks)
+      .values({
+        documentId,
+        content: "A mocked study context.",
+        chunkIndex: 0,
+        pageNumber: 1,
+      })
+      .returning({ id: documentChunks.id });
+
+    if (!chunk) throw new Error("Failed to create test document chunk.");
+
+    chunkId = chunk.id;
+
     const [createdUser] = await db
       .select({ email: users.email })
       .from(users)
@@ -110,6 +170,9 @@ describe("Conversation Messages API", () => {
       .delete(conversations)
       .where(eq(conversations.id, conversationId));
 
+    await db.delete(documents).where(eq(documents.id, documentId));
+    await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
+
     await db.delete(users).where(eq(users.id, userId));
     await db.delete(users).where(eq(users.id, otherUserId));
 
@@ -141,6 +204,84 @@ describe("Conversation Messages API", () => {
     expect(response.body.messages).toBeDefined();
     expect(Array.isArray(response.body.messages)).toBe(true);
     expect(response.body.messages).toHaveLength(0);
+  });
+
+  it("should create and persist user and assistant messages with sources", async () => {
+    vi.mocked(generateRagAnswer).mockResolvedValueOnce({
+      answer: "The mocked answer.",
+      sources: [
+        {
+          chunkId,
+          documentId,
+          content: "A mocked study context.",
+          pageNumber: 1,
+          similarity: 0.92,
+        },
+      ],
+    });
+
+    const [conversationBefore] = await db
+      .select({ updatedAt: conversations.updatedAt })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId));
+
+    const response = await request(app)
+      .post(`/api/v1/conversations/${conversationId}/messages`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ content: "What is in the document?" });
+
+    expect(response.status).toBe(201);
+    expect(response.body.message).toMatchObject({
+      role: "assistant",
+      content: "The mocked answer.",
+      model: "rag",
+      conversationId,
+    });
+    expect(response.body.userMessage).toMatchObject({
+      role: "user",
+      content: "What is in the document?",
+      conversationId,
+    });
+    expect(response.body.sources).toEqual([
+      expect.objectContaining({ chunkId, similarity: 0.92 }),
+    ]);
+
+    const persistedMessages = await db
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId));
+
+    expect(persistedMessages).toHaveLength(2);
+    expect(persistedMessages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+
+    const [assistantMessage] = persistedMessages.filter(
+      (message) => message.role === "assistant",
+    );
+    expect(assistantMessage).toBeDefined();
+
+    const persistedSources = await db
+      .select()
+      .from(messageSources)
+      .where(eq(messageSources.messageId, assistantMessage!.id));
+
+    expect(persistedSources).toHaveLength(1);
+    expect(persistedSources[0]).toMatchObject({
+      messageId: assistantMessage!.id,
+      chunkId,
+      similarity: 0.92,
+    });
+
+    const [conversationAfter] = await db
+      .select({ updatedAt: conversations.updatedAt })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId));
+
+    expect(conversationAfter?.updatedAt.getTime()).toBeGreaterThan(
+      conversationBefore!.updatedAt.getTime(),
+    );
   });
 
   it("should reject another user's access", async () => {

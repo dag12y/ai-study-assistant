@@ -15,76 +15,78 @@ export const createMessage = async (
   userId: string,
   content: string,
 ) => {
-  // 1. Verify that the conversation belongs to the current user.
-  const [conversation] = await db
-    .select({
-      id: conversations.id,
-    })
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.id, conversationId),
-        eq(conversations.userId, userId),
-      ),
-    )
-    .limit(1);
+  return db.transaction(async (tx) => {
+    const [conversation] = await tx
+      .select({
+        id: conversations.id,
+      })
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.id, conversationId),
+          eq(conversations.userId, userId),
+        ),
+      )
+      .limit(1);
 
-  if (!conversation) {
-    throw new AppError(
-      "Conversation not found.",
-      404,
-      "CONVERSATION_NOT_FOUND",
-    );
-  }
+    if (!conversation) {
+      throw new AppError(
+        "Conversation not found.",
+        404,
+        "CONVERSATION_NOT_FOUND",
+      );
+    }
 
-  // 2. Save the user's message.
-  const [userMessage] = await db
-    .insert(messages)
-    .values({
-      conversationId,
-      role: "user",
-      content,
-    })
-    .returning();
+    const [userMessage] = await tx
+      .insert(messages)
+      .values({
+        conversationId,
+        role: "user",
+        content,
+      })
+      .returning();
 
-  if (!userMessage) {
-    throw new Error("Failed to create user message.");
-  }
+    if (!userMessage) {
+      throw new Error("Failed to create user message.");
+    }
 
-  // 3. Run the existing RAG pipeline.
-  const result = await generateRagAnswer(content, 5);
+    const result = await generateRagAnswer(content, 5);
 
-  // 4. Save the assistant's response.
-  const [assistantMessage] = await db
-    .insert(messages)
-    .values({
-      conversationId,
-      role: "assistant",
-      content: result.answer,
-      model: "rag",
-    })
-    .returning();
+    const [assistantMessage] = await tx
+      .insert(messages)
+      .values({
+        conversationId,
+        role: "assistant",
+        content: result.answer,
+        model: "rag",
+      })
+      .returning();
 
-  if (!assistantMessage) {
-    throw new Error("Failed to create assistant message.");
-  }
+    if (!assistantMessage) {
+      throw new Error("Failed to create assistant message.");
+    }
 
-  // 5. Save the document chunks used to generate the answer.
-  if (result.sources.length > 0) {
-    await db.insert(messageSources).values(
-      result.sources.map((source) => ({
-        messageId: assistantMessage.id,
-        chunkId: source.chunkId,
-        similarity: source.similarity,
-      })),
-    );
-  }
+    if (result.sources.length > 0) {
+      await tx.insert(messageSources).values(
+        result.sources.map((source) => ({
+          messageId: assistantMessage.id,
+          chunkId: source.chunkId,
+          similarity: source.similarity,
+        })),
+      );
+    }
 
-  return {
-    userMessage,
-    assistantMessage,
-    sources: result.sources,
-  };
+    await tx
+      .update(conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(conversations.id, conversationId));
+
+    return {
+      userMessage,
+      assistantMessage,
+      sources: result.sources,
+    };
+  });
 };
 
 export const listMessages = async (conversationId: string, userId: string) => {
