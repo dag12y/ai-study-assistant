@@ -140,12 +140,10 @@ describe("Conversation Messages API", () => {
       throw new Error("Failed to retrieve test users.");
     }
 
-    const loginResponse = await request(app)
-      .post("/api/v1/auth/login")
-      .send({
-        email: createdUser.email,
-        password,
-      });
+    const loginResponse = await request(app).post("/api/v1/auth/login").send({
+      email: createdUser.email,
+      password,
+    });
 
     expect(loginResponse.status).toBe(200);
     accessToken = loginResponse.body.data.accessToken;
@@ -166,9 +164,7 @@ describe("Conversation Messages API", () => {
       .delete(messages)
       .where(eq(messages.conversationId, conversationId));
 
-    await db
-      .delete(conversations)
-      .where(eq(conversations.id, conversationId));
+    await db.delete(conversations).where(eq(conversations.id, conversationId));
 
     await db.delete(documents).where(eq(documents.id, documentId));
     await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
