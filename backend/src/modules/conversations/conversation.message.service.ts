@@ -8,7 +8,12 @@ import {
 } from "../../database/schema.js";
 
 import { AppError } from "../../lib/errors.js";
-import { generateRagAnswer } from "../../services/rag.service.js";
+import {
+  generateRagAnswer,
+  type ConversationHistoryMessage,
+} from "../../services/rag.service.js";
+
+const MAX_HISTORY_MESSAGES = 20;
 
 export const createMessage = async (
   conversationId: string,
@@ -37,6 +42,16 @@ export const createMessage = async (
       );
     }
 
+    const history = await tx
+      .select({
+        role: messages.role,
+        content: messages.content,
+      })
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(asc(messages.createdAt))
+      .limit(MAX_HISTORY_MESSAGES);
+
     const [userMessage] = await tx
       .insert(messages)
       .values({
@@ -50,7 +65,12 @@ export const createMessage = async (
       throw new Error("Failed to create user message.");
     }
 
-    const result = await generateRagAnswer(content, 5, userId);
+    const result = await generateRagAnswer(
+      userId,
+      content,
+      5,
+      history as ConversationHistoryMessage[],
+    );
 
     const [assistantMessage] = await tx
       .insert(messages)

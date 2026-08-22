@@ -26,6 +26,7 @@ import {
   retrieveContext,
   generateRagAnswer,
 } from "../src/services/rag.service.js";
+import { generateChatCompletion } from "../src/services/llm.service.js";
 
 describe("RAG", () => {
   let userId: string;
@@ -142,7 +143,7 @@ describe("RAG", () => {
   it("should retrieve relevant context for a question", async () => {
     const question = "ሶበ ይነቅህ ካህን ተከሥተ ብርሃን ለኩሉ ዓለም ማን ነው ያለው?";
 
-    const chunks = await retrieveContext(question, 5, userId);
+    const chunks = await retrieveContext(userId, question, 5);
 
     expect(chunks.length).toBeGreaterThan(0);
 
@@ -152,6 +153,7 @@ describe("RAG", () => {
     expect(chunks[0]?.content).toBeTruthy();
 
     expect(chunks[0]?.documentId).toBe(documentId);
+    expect(chunks[0]?.documentName).toBe("RAG Test Document");
 
     expect(chunks[0]?.similarity).toBeGreaterThan(0);
   }, 30_000);
@@ -159,7 +161,7 @@ describe("RAG", () => {
   it("should generate an answer using retrieved document context", async () => {
     const question = "ሶበ ይነቅህ ካህን ተከሥተ ብርሃን ለኩሉ ዓለም ማን ነው ያለው?";
 
-    const result = await generateRagAnswer(question, 5, userId);
+    const result = await generateRagAnswer(userId, question, 5);
     console.log("RAG Result:", result);
 
     expect(result.answer).toBeTruthy();
@@ -170,4 +172,23 @@ describe("RAG", () => {
 
     expect(result.sources.length).toBeGreaterThan(0);
   }, 30_000);
+
+  it("should include conversation history in the LLM prompt", async () => {
+    vi.mocked(generateChatCompletion).mockClear();
+
+    await generateRagAnswer(userId, "What did I ask before?", 5, [
+      { role: "user", content: "What is chapter one about?" },
+      { role: "assistant", content: "It introduces the main topic." },
+    ]);
+
+    const calls = vi.mocked(generateChatCompletion).mock.calls;
+    const prompt = calls[calls.length - 1]?.[0];
+
+    expect(prompt).toEqual(
+      expect.arrayContaining([
+        { role: "user", content: "What is chapter one about?" },
+        { role: "assistant", content: "It introduces the main topic." },
+      ]),
+    );
+  });
 });

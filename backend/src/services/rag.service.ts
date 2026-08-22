@@ -1,12 +1,22 @@
 import { generateDocumentEmbedding } from "./embedding.service.js";
 import { searchSimilarChunks } from "./vector-search.service.js";
 import { generateChatCompletion } from "./llm.service.js";
+import { AppError } from "../lib/errors.js";
+
+export type ConversationHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
 
 export const retrieveContext = async (
+  userId: string,
   question: string,
   limit = 5,
-  userId?: string,
 ) => {
+  if (!question.trim()) {
+    throw new AppError("Question is required.", 400, "QUESTION_REQUIRED");
+  }
+
   const queryEmbedding = await generateDocumentEmbedding(question);
 
   const chunks = await searchSimilarChunks(queryEmbedding, limit, userId);
@@ -15,11 +25,12 @@ export const retrieveContext = async (
 };
 
 export const generateRagAnswer = async (
+  userId: string,
   question: string,
   limit = 5,
-  userId?: string,
+  history: ConversationHistoryMessage[] = [],
 ) => {
-  const chunks = await retrieveContext(question, limit, userId);
+  const chunks = await retrieveContext(userId, question, limit);
 
   const context = chunks
     .map((chunk, index) => `[Source ${index + 1}]\n${chunk.content}`)
@@ -39,13 +50,14 @@ Rules:
 - Give a clear and educational answer.
 - When appropriate, explain the answer step by step.`,
     },
+    ...history,
     {
       role: "user",
-      content: `Context:
+      content: `Retrieved document context:
 
-${context}
+${context || "No relevant document context was found."}
 
-Question:
+Current question:
 ${question}`,
     },
   ]);

@@ -202,6 +202,26 @@ describe("Conversation Messages API", () => {
     expect(response.body.messages).toHaveLength(0);
   });
 
+  it("should not persist messages when RAG generation fails", async () => {
+    vi.mocked(generateRagAnswer).mockRejectedValueOnce(
+      new Error("LLM unavailable"),
+    );
+
+    const response = await request(app)
+      .post(`/api/v1/conversations/${conversationId}/messages`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ content: "This should fail." });
+
+    expect(response.status).toBe(500);
+
+    const persistedMessages = await db
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId));
+
+    expect(persistedMessages).toHaveLength(0);
+  });
+
   it("should create and persist user and assistant messages with sources", async () => {
     vi.mocked(generateRagAnswer).mockResolvedValueOnce({
       answer: "The mocked answer.",
@@ -209,6 +229,7 @@ describe("Conversation Messages API", () => {
         {
           chunkId,
           documentId,
+          documentName: "Message Test Document",
           content: "A mocked study context.",
           pageNumber: 1,
           similarity: 0.92,
