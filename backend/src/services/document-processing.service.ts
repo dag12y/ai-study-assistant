@@ -1,21 +1,26 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "../database/client.js";
-import { documentChunks, documents } from "../database/schema.js";
+import { documentChunks, documents, workspaces } from "../database/schema.js";
 import { AppError } from "../lib/errors.js";
 import { localStorageService } from "./local-storage.service.js";
 import { extractPdfText } from "./pdf-extractor.service.js";
 import { chunkDocument } from "./document-chunking.service.js";
 import { generateDocumentEmbedding } from "./embedding.service.js";
 
-export const processDocument = async (documentId: string) => {
+export const processDocument = async (documentId: string, userId?: string) => {
   const [document] = await db
     .select({
       id: documents.id,
       storageKey: documents.storageKey,
     })
     .from(documents)
-    .where(eq(documents.id, documentId))
+    .innerJoin(workspaces, eq(documents.workspaceId, workspaces.id))
+    .where(
+      userId
+        ? and(eq(documents.id, documentId), eq(workspaces.ownerId, userId))
+        : eq(documents.id, documentId),
+    )
     .limit(1);
 
   if (!document) {
@@ -30,6 +35,10 @@ export const processDocument = async (documentId: string) => {
     })
     .where(eq(documents.id, documentId));
   try {
+    await db
+      .delete(documentChunks)
+      .where(eq(documentChunks.documentId, document.id));
+
     const pdfBuffer = await localStorageService.download(document.storageKey);
 
     const pages = await extractPdfText(pdfBuffer);

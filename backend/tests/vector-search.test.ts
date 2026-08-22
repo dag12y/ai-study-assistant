@@ -1,7 +1,13 @@
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it, beforeAll, afterAll, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+
+vi.mock("../src/services/embedding.service.js", () => ({
+  generateDocumentEmbedding: vi.fn(() =>
+    Promise.resolve(Array.from({ length: 512 }, () => 0.1)),
+  ),
+}));
 
 import { hashPassword } from "../src/modules/auth/auth.utils.js";
 
@@ -133,7 +139,7 @@ describe("Vector search", () => {
         sourceChunk!.content,
       );
 
-      const results = await searchSimilarChunks(queryEmbedding, 5);
+      const results = await searchSimilarChunks(queryEmbedding, 5, userId);
 
       expect(results.length).toBeGreaterThan(0);
 

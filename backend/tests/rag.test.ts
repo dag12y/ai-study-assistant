@@ -1,7 +1,19 @@
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it, beforeAll, afterAll, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+
+vi.mock("../src/services/embedding.service.js", () => ({
+  generateDocumentEmbedding: vi.fn(() =>
+    Promise.resolve(Array.from({ length: 512 }, () => 0.1)),
+  ),
+}));
+
+vi.mock("../src/services/llm.service.js", () => ({
+  generateChatCompletion: vi.fn(() =>
+    Promise.resolve("This is a deterministic test answer."),
+  ),
+}));
 
 import { hashPassword } from "../src/modules/auth/auth.utils.js";
 
@@ -130,7 +142,7 @@ describe("RAG", () => {
   it("should retrieve relevant context for a question", async () => {
     const question = "ሶበ ይነቅህ ካህን ተከሥተ ብርሃን ለኩሉ ዓለም ማን ነው ያለው?";
 
-    const chunks = await retrieveContext(question, 5);
+    const chunks = await retrieveContext(question, 5, userId);
 
     expect(chunks.length).toBeGreaterThan(0);
 
@@ -147,7 +159,7 @@ describe("RAG", () => {
   it("should generate an answer using retrieved document context", async () => {
     const question = "ሶበ ይነቅህ ካህን ተከሥተ ብርሃን ለኩሉ ዓለም ማን ነው ያለው?";
 
-    const result = await generateRagAnswer(question, 5);
+    const result = await generateRagAnswer(question, 5, userId);
     console.log("RAG Result:", result);
 
     expect(result.answer).toBeTruthy();

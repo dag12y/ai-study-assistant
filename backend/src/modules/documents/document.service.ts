@@ -8,6 +8,7 @@ import { localStorageService } from "../../services/local-storage.service.js";
 
 type DocumentSummary = {
   id: string;
+  workspaceId: string;
   title: string;
   originalFilename: string;
   mimeType: string;
@@ -69,6 +70,7 @@ const getOwnedDocument = async (userId: string, documentId: string) => {
 
 const mapDocumentSummary = (document: DocumentDetails): DocumentSummary => ({
   id: document.id,
+  workspaceId: document.workspaceId,
   title: document.title,
   originalFilename: document.originalFilename,
   mimeType: document.mimeType,
@@ -100,6 +102,40 @@ export const listDocumentsForWorkspace = async (
     })
     .from(documents)
     .where(eq(documents.workspaceId, workspaceId))
+    .orderBy(desc(documents.createdAt));
+
+  return workspaceDocuments.map(mapDocumentSummary);
+};
+
+export const listDocumentsForUser = async (
+  userId: string,
+  workspaceId?: string,
+) => {
+  const workspaceDocuments = await db
+    .select({
+      id: documents.id,
+      workspaceId: documents.workspaceId,
+      uploadedBy: documents.uploadedBy,
+      title: documents.title,
+      originalFilename: documents.originalFileName,
+      mimeType: documents.mimeType,
+      fileSize: documents.fileSize,
+      storageKey: documents.storageKey,
+      status: documents.status,
+      errorMessage: documents.errorMessage,
+      createdAt: documents.createdAt,
+      updatedAt: documents.updatedAt,
+    })
+    .from(documents)
+    .innerJoin(workspaces, eq(documents.workspaceId, workspaces.id))
+    .where(
+      workspaceId
+        ? and(
+            eq(workspaces.ownerId, userId),
+            eq(documents.workspaceId, workspaceId),
+          )
+        : eq(workspaces.ownerId, userId),
+    )
     .orderBy(desc(documents.createdAt));
 
   return workspaceDocuments.map(mapDocumentSummary);

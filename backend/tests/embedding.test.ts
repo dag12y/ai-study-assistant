@@ -1,4 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("cohere-ai", () => ({
+  CohereClientV2: class {
+    async embed() {
+      return {
+        embeddings: {
+          float: [Array.from({ length: 512 }, () => 0.1)],
+        },
+      };
+    }
+  },
+}));
 
 import { generateDocumentEmbedding } from "../src/services/embedding.service.js";
 

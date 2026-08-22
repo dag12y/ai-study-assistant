@@ -2,16 +2,24 @@ import { generateDocumentEmbedding } from "./embedding.service.js";
 import { searchSimilarChunks } from "./vector-search.service.js";
 import { generateChatCompletion } from "./llm.service.js";
 
-export const retrieveContext = async (question: string, limit = 5) => {
+export const retrieveContext = async (
+  question: string,
+  limit = 5,
+  userId?: string,
+) => {
   const queryEmbedding = await generateDocumentEmbedding(question);
 
-  const chunks = await searchSimilarChunks(queryEmbedding, limit);
+  const chunks = await searchSimilarChunks(queryEmbedding, limit, userId);
 
   return chunks;
 };
 
-export const generateRagAnswer = async (question: string, limit = 5) => {
-  const chunks = await retrieveContext(question, limit);
+export const generateRagAnswer = async (
+  question: string,
+  limit = 5,
+  userId?: string,
+) => {
+  const chunks = await retrieveContext(question, limit, userId);
 
   const context = chunks
     .map((chunk, index) => `[Source ${index + 1}]\n${chunk.content}`)

@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 
 import { db } from "../database/client.js";
 import { documentChunks } from "../database/schema.js";
+import { documents, workspaces } from "../database/schema.js";
 
 export type SimilarChunk = {
   chunkId: string;
@@ -14,6 +15,7 @@ export type SimilarChunk = {
 export const searchSimilarChunks = async (
   queryEmbedding: number[],
   limit = 5,
+  userId?: string,
 ): Promise<SimilarChunk[]> => {
   const embedding = `[${queryEmbedding.join(",")}]`;
 
@@ -31,7 +33,10 @@ export const searchSimilarChunks = async (
       ${documentChunks.pageNumber} AS page_number,
       1 - (${documentChunks.embedding} <=> ${embedding}::vector) AS similarity
     FROM ${documentChunks}
+    INNER JOIN ${documents} ON ${documentChunks.documentId} = ${documents.id}
+    INNER JOIN ${workspaces} ON ${documents.workspaceId} = ${workspaces.id}
     WHERE ${documentChunks.embedding} IS NOT NULL
+      ${userId ? sql`AND ${workspaces.ownerId} = ${userId}` : sql``}
     ORDER BY ${documentChunks.embedding} <=> ${embedding}::vector
     LIMIT ${limit}
   `);

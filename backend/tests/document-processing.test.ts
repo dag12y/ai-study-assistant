@@ -1,8 +1,14 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
+
+vi.mock("../src/services/embedding.service.js", () => ({
+  generateDocumentEmbedding: vi.fn(() =>
+    Promise.resolve(Array.from({ length: 512 }, () => 0.1)),
+  ),
+}));
 
 import { db, pool } from "../src/database/client.js";
 import {

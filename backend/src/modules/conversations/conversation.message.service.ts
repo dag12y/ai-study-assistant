@@ -50,7 +50,7 @@ export const createMessage = async (
       throw new Error("Failed to create user message.");
     }
 
-    const result = await generateRagAnswer(content, 5);
+    const result = await generateRagAnswer(content, 5, userId);
 
     const [assistantMessage] = await tx
       .insert(messages)

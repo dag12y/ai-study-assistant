@@ -5,9 +5,14 @@ import {
   deleteDocument as deleteDocumentRecord,
   getDocumentForUser,
   getDocumentStatusForUser,
+  listDocumentsForUser,
   listDocumentsForWorkspace,
 } from "./document.service.js";
-import { createDocumentSchema } from "./document.schemas.js";
+import {
+  createDocumentSchema,
+  documentIdSchema,
+  listDocumentsQuerySchema,
+} from "./document.schemas.js";
 import { processDocument } from "../../services/document-processing.service.js";
 
 export const listDocuments: RequestHandler = async (req, res, next) => {
@@ -22,6 +27,20 @@ export const listDocuments: RequestHandler = async (req, res, next) => {
       data: {
         documents,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listUserDocuments: RequestHandler = async (req, res, next) => {
+  try {
+    const { workspaceId } = listDocumentsQuerySchema.parse(req.query);
+    const documents = await listDocumentsForUser(req.user!.id, workspaceId);
+
+    res.status(200).json({
+      success: true,
+      data: { documents },
     });
   } catch (error) {
     next(error);
@@ -50,7 +69,7 @@ export const uploadDocument: RequestHandler = async (req, res, next) => {
       req.file,
     );
 
-    void processDocument(document.id).catch((error) => {
+    void processDocument(document.id, req.user!.id).catch((error) => {
       console.error(
         `Background processing failed for document ${document.id}:`,
         error,
@@ -69,12 +88,60 @@ export const uploadDocument: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const uploadUserDocument: RequestHandler = async (req, res, next) => {
+  try {
+    const input = createDocumentSchema.parse(req.body);
+
+    if (!input.workspaceId) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "WORKSPACE_REQUIRED",
+          message: "A workspace is required.",
+        },
+      });
+      return;
+    }
+
+    if (!req.file) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "FILE_REQUIRED",
+          message: "A PDF file is required.",
+        },
+      });
+      return;
+    }
+
+    const document = await createDocument(
+      input.workspaceId,
+      req.user!.id,
+      input,
+      req.file,
+    );
+
+    void processDocument(document.id, req.user!.id).catch((error) => {
+      console.error(
+        `Background processing failed for document ${document.id}:`,
+        error,
+      );
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { document },
+      message: "Document uploaded successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getDocument: RequestHandler = async (req, res, next) => {
   try {
-    const document = await getDocumentForUser(
-      req.user!.id,
-      req.params.documentId as string,
-    );
+    const { documentId } = documentIdSchema.parse(req.params);
+    const document = await getDocumentForUser(req.user!.id, documentId);
 
     res.status(200).json({
       success: true,
@@ -89,10 +156,8 @@ export const getDocument: RequestHandler = async (req, res, next) => {
 
 export const getDocumentStatus: RequestHandler = async (req, res, next) => {
   try {
-    const document = await getDocumentStatusForUser(
-      req.user!.id,
-      req.params.documentId as string,
-    );
+    const { documentId } = documentIdSchema.parse(req.params);
+    const document = await getDocumentStatusForUser(req.user!.id, documentId);
 
     res.status(200).json({
       success: true,
@@ -105,7 +170,8 @@ export const getDocumentStatus: RequestHandler = async (req, res, next) => {
 
 export const deleteDocument: RequestHandler = async (req, res, next) => {
   try {
-    await deleteDocumentRecord(req.user!.id, req.params.documentId as string);
+    const { documentId } = documentIdSchema.parse(req.params);
+    await deleteDocumentRecord(req.user!.id, documentId);
 
     res.status(204).send();
   } catch (error) {

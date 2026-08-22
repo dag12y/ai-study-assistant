@@ -1,8 +1,14 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import request from "supertest";
 import fs, { readFile } from "node:fs/promises";
 import path from "node:path";
+
+vi.mock("../src/services/embedding.service.js", () => ({
+  generateDocumentEmbedding: vi.fn(() =>
+    Promise.resolve(Array.from({ length: 512 }, () => 0.1)),
+  ),
+}));
 
 import app from "../src/app.js";
 import { db, pool } from "../src/database/client.js";
